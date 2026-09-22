@@ -1,19 +1,65 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/user_model.dart';
+import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthController {
-  final auth = FirebaseAuth.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
-  UserModel? get user {
-    final u = auth.currentUser;
-    return u?.email == null ? null : UserModel(email: u!.email!);
+  User? get user => _auth.currentUser;
+
+  Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  Future<UserCredential> login(
+      String email,
+      String password,
+      ) async {
+    return await _auth.signInWithEmailAndPassword(
+      email: email.trim(),
+      password: password,
+    );
   }
 
-  Future<void> signup(String e, String p) =>
-      auth.createUserWithEmailAndPassword(email: e, password: p);
+  Future<UserCredential> signup(
+      String email,
+      String password,
+      ) async {
+    return await _auth.createUserWithEmailAndPassword(
+      email: email.trim(),
+      password: password,
+    );
+  }
 
-  Future<void> login(String e, String p) =>
-      auth.signInWithEmailAndPassword(email: e, password: p);
+  Future<UserCredential?> googleLogin() async {
+    try {
+      if (kIsWeb) {
+        return await _auth.signInWithPopup(
+          GoogleAuthProvider(),
+        );
+      }
 
-  Future<void> logout() => auth.signOut();
+      await _googleSignIn.initialize();
+
+      final googleUser = await _googleSignIn.authenticate();
+
+      final googleAuth = googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        idToken: googleAuth.idToken,
+      );
+
+      return await _auth.signInWithCredential(credential);
+    } catch (e) {
+      debugPrint('Google Sign-In Error: $e');
+      return null;
+    }
+  }
+
+  Future<void> logout() async {
+    await _auth.signOut();
+
+    if (!kIsWeb) {
+      await _googleSignIn.signOut();
+    }
+  }
 }
